@@ -144,10 +144,7 @@ Answer 1''')
         mock_file.assert_called_once_with(TALLMAN_QA_FILE, 'a')
         handle = mock_file()
         # Check calls to write to ensure correct format
-        # Expected: "New Q
-", "New A
-", "
-"
+        # Expected write calls: f"{question}\n", f"{answer}\n", "\n\n"
         self.assertIn(call(f"{question}\n"), handle.write.call_args_list)
         self.assertIn(call(f"{answer}\n"), handle.write.call_args_list)
         self.assertIn(call("\n\n"), handle.write.call_args_list)
@@ -171,8 +168,7 @@ Answer 1''')
 
         mock_file.assert_called_once_with(MCR_QA_FILE, 'a')
         handle = mock_file()
-        # Check that "##Update##
-" is the first thing written in this append operation
+        # Check that call("##Update##\n") is the first thing written.
         # This requires careful checking of call order if other writes happen before it in a real scenario.
         # For an append, it's simpler.
         expected_calls = [

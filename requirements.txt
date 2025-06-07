@@ -4,3 +4,4 @@ python-dotenv
 openai
 chromadb
 sentence-transformers
+pytest>=7.0
