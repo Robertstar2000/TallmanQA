@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Tallman App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> <!-- Optional: if you have a main CSS file -->
+</head>
+<body>
+    <header>
+        <h1>Login to Tallman App</h1>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form id="loginForm" method="POST" action="{{ url_for('login') }}">
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div>
+            <input type="submit" value="Login">
+        </div>
+    </form>
+    <div id="loginMessage" style="margin-top:10px;"></div>
+
+    <!-- Optional: Link to a registration page if you plan to have one -->
+    <!-- <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a>.</p> -->
+
+{% block scripts_extra %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const loginMessageDiv = document.getElementById('loginMessage');
+        loginMessageDiv.innerHTML = ''; // Clear previous messages
+
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('password', password);
+
+        try {
+            const response = await fetch("{{ url_for('login') }}", {
+                method: 'POST',
+                body: new URLSearchParams(formData) // Send as form data
+                // If your Flask endpoint for login expects JSON, change body and Content-Type:
+                // headers: { 'Content-Type': 'application/json' },
+                // body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                loginMessageDiv.innerHTML = `<p style="color:green">${data.message}</p>`;
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    // Fallback if no redirect URL is provided, though /login should give one
+                    window.location.href = "{{ url_for('index') }}";
+                }
+            } else {
+                loginMessageDiv.innerHTML = `<p style="color:red;">${data.message || 'Login failed.'}</p>`;
+            }
+        } catch (error) {
+            console.error('Login request failed:', error);
+            loginMessageDiv.innerHTML = `<p style="color:red;">An error occurred during login. Please try again.</p>`;
+        }
+    });
+</script>
+{% endblock %}
+</body>
+</html>

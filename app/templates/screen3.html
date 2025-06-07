@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Tallman App{% endblock %}
+
+{% block content %}
+<h1>Manage Users (Screen 3)</h1>
+<p>This page is for administrators to manage user accounts.</p>
+
+<div id="userManagementArea">
+    <h2>Existing Users</h2>
+    <table border="1" id="usersTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if users %}
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.status }}</td>
+                    <td>
+                        <button onclick="editUser('{{ user.id }}', '{{ user.name }}', '{{ user.email }}', '{{ user.status }}')">Edit</button>
+                        <button onclick="deleteUser('{{ user.id }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="5">No users found.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <hr>
+    <h2>Add New User</h2>
+    <form id="addUserForm">
+        <div>
+            <label for="new_user_name">Name:</label>
+            <input type="text" id="new_user_name" name="name" required>
+        </div>
+        <div>
+            <label for="new_user_email">Email:</label>
+            <input type="email" id="new_user_email" name="email" required>
+        </div>
+        <div>
+            <label for="new_user_password">Password:</label>
+            <input type="password" id="new_user_password" name="password" required>
+        </div>
+        <div>
+            <label for="new_user_status">Status:</label>
+            <select id="new_user_status" name="status">
+                <option value="regular">Regular</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit">Add User</button>
+        </div>
+    </form>
+</div>
+<div id="editUserModal" style="display:none; border:1px solid black; padding:10px; margin-top:10px;">
+    <h2>Edit User</h2>
+    <form id="editUserForm">
+        <input type="hidden" id="edit_user_id" name="id">
+        <div>
+            <label for="edit_user_name">Name:</label>
+            <input type="text" id="edit_user_name" name="name" required>
+        </div>
+        <div>
+            <label for="edit_user_email">Email:</label>
+            <input type="email" id="edit_user_email" name="email" required readonly> <!-- Email as identifier, usually not changed -->
+        </div>
+        <div>
+            <label for="edit_user_status">Status:</label>
+            <select id="edit_user_status" name="status">
+                <option value="regular">Regular</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div>
+            <label for="edit_user_password">New Password (optional):</label>
+            <input type="password" id="edit_user_password" name="password">
+        </div>
+        <div>
+            <button type="submit">Save Changes</button>
+            <button type="button" onclick="document.getElementById('editUserModal').style.display='none';">Cancel</button>
+        </div>
+    </form>
+</div>
+
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    // JavaScript for fetching users, populating the table,
+    // handling add user form, edit user, and delete user actions will go here.
+    // This will be added in a subsequent step that focuses on frontend logic
+    // and API interaction for user management.
+    // console.log("Manage Users screen script area.");
+
+    // Example:
+    // function fetchUsers() { /* fetch from /api/users and populate table */ }
+    // document.getElementById('addUserForm').addEventListener('submit', function(e) { /* call /api/users POST */ });
+
+    function editUser(userId, name, email, status) {
+        console.log("Attempting to edit user:", userId);
+        document.getElementById('edit_user_id').value = userId;
+        document.getElementById('edit_user_name').value = name;
+        document.getElementById('edit_user_email').value = email;
+        document.getElementById('edit_user_status').value = status;
+        document.getElementById('editUserModal').style.display = 'block';
+    }
+
+    // document.getElementById('editUserForm').addEventListener('submit', function(e) { /* call /api/users/<id> PUT */ });
+
+    function deleteUser(userId) {
+        console.log("Attempting to delete user:", userId);
+        if(confirm('Are you sure you want to delete user ' + userId + '? This action cannot be undone.')) {
+            // Placeholder for API call:
+            // fetch('/api/users/' + userId, { method: 'DELETE' })
+            // .then(response => response.json())
+            // .then(data => { console.log(data); location.reload(); })
+            // .catch(error => console.error('Error:', error));
+            alert('Delete functionality for user ' + userId + ' is a placeholder.');
+        }
+    }
+
+    // Placeholder for fetching users if not passed directly or for dynamic updates
+    // function fetchUsers() { /* fetch from /api/users and populate table */ }
+    // if users are not passed directly or need refresh, uncomment and implement:
+    // document.addEventListener('DOMContentLoaded', fetchUsers);
+</script>
+{% endblock %}

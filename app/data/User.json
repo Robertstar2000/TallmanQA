@@ -1,0 +1,16 @@
+[
+  {
+    "id": "admin001",
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "status": "admin",
+    "hashed_password": "pbkdf2:sha256:600000$0gHjKlMnOpQrStUv$c6184a5353f2f3c7a3a6e1f7675f4b37f5734f51180b1a3f9f19f7ad1f1a4e9d"
+  },
+  {
+    "id": "user001",
+    "name": "Regular User",
+    "email": "user@example.com",
+    "status": "regular",
+    "hashed_password": "pbkdf2:sha256:600000$1AbCdEfGhIjKlMnOp$d8f82af9d9354e14b3e3f596435e5a79ae53182703758e90f9837f507370f1b1"
+  }
+]
