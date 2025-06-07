@@ -1,0 +1,6 @@
+flask
+werkzeug
+python-dotenv
+openai
+chromadb
+sentence-transformers
