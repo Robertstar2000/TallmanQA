@@ -308,5 +308,34 @@ Follow these steps to set up and run TallmanChat locally:
     *   This screen displays a list of current users.
     *   Functionality to add, edit, or delete users is accessible via API endpoints (`/api/users/...`) but might require frontend implementation or direct API calls for full use.
 
+## Running Tests
+
+This project uses a combination of `unittest` style tests that can be run with a test runner like `pytest`.
+
+1.  **Install Pytest (if not already installed):**
+    If you don't have `pytest` installed in your virtual environment:
+    ```bash
+    pip install pytest
+    ```
+    (Consider adding `pytest` to `requirements.txt` if it's the recommended way to run tests).
+
+2.  **Navigate to the Root Directory:**
+    Ensure you are in the root directory of the project (the `TallmanChat` directory where `tests/` and `app/` are located).
+
+3.  **Run Tests:**
+    Execute the following command in your terminal:
+    ```bash
+    pytest
+    ```
+    Pytest will automatically discover and run the tests in the `tests/` directory. You should see output indicating the number of tests passed, failed, or skipped.
+
+    If you prefer to use `unittest`'s built-in test discovery:
+    ```bash
+    python -m unittest discover -s tests -p "test_*.py"
+    ```
+
+*(Optional: Add `pytest` to `requirements.txt`)*
+If you want to ensure `pytest` is part of the project's standard dependencies, add `pytest` (possibly with a version, e.g., `pytest>=7.0`) to your `requirements.txt` file and have users install it via `pip install -r requirements.txt`.
+
 ---
 *This README provides a comprehensive guide to understanding, installing, and using TallmanChat.*
