@@ -16,7 +16,7 @@
                 <li><a href="{{ url_for('ask_ai') }}">Ask AI</a></li>
                 <li><a href="{{ url_for('correct_answer') }}">Correct Answer</a></li>
                 {% if session.status == 'admin' %}
-                    <li><a href="{{ url_for('manage_users') }}">Manage Users</a></li>
+                        <li><a href="{{ url_for('manage_users') }}">Admin Panel</a></li>
                 {% endif %}
                 <li><a href="{{ url_for('logout') }}">Logout ({{ session.name }})</a></li>
             {% else %}

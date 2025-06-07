@@ -5,10 +5,11 @@
 {% block content %}
 <h1>Manage Users (Screen 3)</h1>
 <p>This page is for administrators to manage user accounts.</p>
+<div id="userManagementMessages" class="mb-3"></div> <!-- For displaying success/error messages -->
 
 <div id="userManagementArea">
     <h2>Existing Users</h2>
-    <table border="1" id="usersTable">
+    <table class="table table-striped" id="usersTable"> <!-- Added bootstrap class -->
         <thead>
             <tr>
                 <th>ID</th>
@@ -21,14 +22,14 @@
         <tbody>
             {% if users %}
                 {% for user in users %}
-                <tr>
+                <tr data-user-id="{{ user.id }}"> {# Add data-user-id to row for easier selection #}
                     <td>{{ user.id }}</td>
                     <td>{{ user.name }}</td>
                     <td>{{ user.email }}</td>
                     <td>{{ user.status }}</td>
                     <td>
-                        <button onclick="editUser('{{ user.id }}', '{{ user.name }}', '{{ user.email }}', '{{ user.status }}')">Edit</button>
-                        <button onclick="deleteUser('{{ user.id }}')">Delete</button>
+                        <button class="btn btn-sm btn-primary edit-user-btn" data-id="{{ user.id }}" data-name="{{ user.name }}" data-email="{{ user.email }}" data-status="{{ user.status }}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-user-btn" data-id="{{ user.id }}">Delete</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -41,60 +42,111 @@
     </table>
 
     <hr>
-    <h2>Add New User</h2>
-    <form id="addUserForm">
-        <div>
-            <label for="new_user_name">Name:</label>
-            <input type="text" id="new_user_name" name="name" required>
-        </div>
-        <div>
-            <label for="new_user_email">Email:</label>
-            <input type="email" id="new_user_email" name="email" required>
-        </div>
-        <div>
-            <label for="new_user_password">Password:</label>
-            <input type="password" id="new_user_password" name="password" required>
-        </div>
-        <div>
-            <label for="new_user_status">Status:</label>
-            <select id="new_user_status" name="status">
-                <option value="regular">Regular</option>
-                <option value="admin">Admin</option>
-            </select>
-        </div>
-        <div>
-            <button type="submit">Add User</button>
-        </div>
-    </form>
+    <!-- "Add User" Button to toggle form visibility -->
+    <button type="button" class="btn btn-success mb-3" id="showAddUserFormBtn">Add New User</button>
+
+    <!-- Add User Form (Initially Hidden) -->
+    <div id="addUserModal" style="display:none; border:1px solid #ccc; padding:20px; margin-bottom:20px; background-color:#f9f9f9;">
+        <h2>Add New User</h2>
+        <form id="addUserForm">
+            <div class="form-group mb-2">
+                <label for="add_user_name">Name:</label>
+                <input type="text" class="form-control" id="add_user_name" name="name" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="add_user_email">Email:</label>
+                <input type="email" class="form-control" id="add_user_email" name="email" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="add_user_password">Password:</label>
+                <input type="password" class="form-control" id="add_user_password" name="password" required>
+            </div>
+            <div class="form-group mb-2">
+                <label for="add_user_status">Status:</label>
+                <select class="form-control" id="add_user_status" name="status">
+                    <option value="user">User</option> {# Changed from regular to user #}
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Create User</button>
+            <button type="button" class="btn btn-secondary" id="cancelAddUserBtn">Cancel</button>
+        </form>
+    </div>
 </div>
 <div id="editUserModal" style="display:none; border:1px solid black; padding:10px; margin-top:10px;">
     <h2>Edit User</h2>
     <form id="editUserForm">
         <input type="hidden" id="edit_user_id" name="id">
-        <div>
+        <div class="form-group mb-2">
             <label for="edit_user_name">Name:</label>
-            <input type="text" id="edit_user_name" name="name" required>
+            <input type="text" class="form-control" id="edit_user_name" name="name" required>
         </div>
-        <div>
+        <div class="form-group mb-2">
             <label for="edit_user_email">Email:</label>
-            <input type="email" id="edit_user_email" name="email" required readonly> <!-- Email as identifier, usually not changed -->
+            <input type="email" class="form-control" id="edit_user_email" name="email" required> <!-- Removed readonly -->
         </div>
-        <div>
+        <div class="form-group mb-2">
             <label for="edit_user_status">Status:</label>
-            <select id="edit_user_status" name="status">
-                <option value="regular">Regular</option>
+            <select class="form-control" id="edit_user_status" name="status">
+                <option value="user">User</option> {# Changed from regular to user #}
                 <option value="admin">Admin</option>
             </select>
         </div>
-        <div>
+        <div class="form-group mb-2">
             <label for="edit_user_password">New Password (optional):</label>
-            <input type="password" id="edit_user_password" name="password">
+            <input type="password" class="form-control" id="edit_user_password" name="password">
         </div>
         <div>
-            <button type="submit">Save Changes</button>
-            <button type="button" onclick="document.getElementById('editUserModal').style.display='none';">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('editUserModal').style.display='none';">Cancel</button>
         </div>
     </form>
+</div>
+<!-- End of the first editUserModal -->
+
+<!-- The second, simpler editUserModal should be removed. -->
+<!-- The Q&A Management section will be added here -->
+<hr class="my-5"> <!-- Separator -->
+
+<div id="qaManagementArea" class="mt-4">
+    <h2>Manage Q&A Data</h2>
+    <p>Download existing Q&A data for a company or upload new Q&A pairs from a JSON file.</p>
+    <div id="qaManagementMessages" class="mb-3"></div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Select Company</h3>
+            <div class="form-group mb-3">
+                <label for="qaCompanySelect">Company:</label>
+                <select id="qaCompanySelect" class="form-control">
+                    <option value="">-- Select a Company --</option>
+                    <option value="Tallman">Tallman</option>
+                    <option value="MCR">MCR</option>
+                    <option value="Bradley">Bradley</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Download Q&A Data</h3>
+            <p>Download all Q&A pairs for the selected company as a JSON file.</p>
+            <button id="downloadQaBtn" class="btn btn-info">Download Q&A (JSON)</button>
+        </div>
+
+        <div class="col-md-6">
+            <h3>Upload Q&A Data</h3>
+            <p>Upload a JSON file containing new Q&A pairs for the selected company. Each item in the JSON array must have "question" and "answer" keys.</p>
+            <form id="uploadQaForm" enctype="multipart/form-data">
+                <div class="form-group mb-2">
+                    <label for="qaFile">Select JSON File:</label>
+                    <input type="file" id="qaFile" name="file" class="form-control" accept=".json" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload Q&A File</button>
+            </form>
+        </div>
+    </div>
 </div>
 
 
@@ -102,42 +154,250 @@
 
 {% block scripts_extra %}
 <script>
-    // JavaScript for fetching users, populating the table,
-    // handling add user form, edit user, and delete user actions will go here.
-    // This will be added in a subsequent step that focuses on frontend logic
-    // and API interaction for user management.
-    // console.log("Manage Users screen script area.");
+    const userManagementMessages = document.getElementById('userManagementMessages'); // User management messages
+    const qaManagementMessages = document.getElementById('qaManagementMessages'); // Q&A management messages
+    const addUserModal = document.getElementById('addUserModal');
+    // Ensure this targets the correct (single) editUserModal
+    const editUserModal = document.getElementById('editUserModal');
+    const addUserForm = document.getElementById('addUserForm');
+    const editUserForm = document.getElementById('editUserForm');
 
-    // Example:
-    // function fetchUsers() { /* fetch from /api/users and populate table */ }
-    // document.getElementById('addUserForm').addEventListener('submit', function(e) { /* call /api/users POST */ });
-
-    function editUser(userId, name, email, status) {
-        console.log("Attempting to edit user:", userId);
-        document.getElementById('edit_user_id').value = userId;
-        document.getElementById('edit_user_name').value = name;
-        document.getElementById('edit_user_email').value = email;
-        document.getElementById('edit_user_status').value = status;
-        document.getElementById('editUserModal').style.display = 'block';
+    function showMessage(message, type = 'success') {
+        userManagementMessages.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'danger'}" role="alert">${message}</div>`;
     }
 
-    // document.getElementById('editUserForm').addEventListener('submit', function(e) { /* call /api/users/<id> PUT */ });
+    function clearMessages() {
+        userManagementMessages.innerHTML = '';
+    }
 
-    function deleteUser(userId) {
-        console.log("Attempting to delete user:", userId);
-        if(confirm('Are you sure you want to delete user ' + userId + '? This action cannot be undone.')) {
-            // Placeholder for API call:
-            // fetch('/api/users/' + userId, { method: 'DELETE' })
-            // .then(response => response.json())
-            // .then(data => { console.log(data); location.reload(); })
-            // .catch(error => console.error('Error:', error));
-            alert('Delete functionality for user ' + userId + ' is a placeholder.');
+    function refreshPage() {
+        // For now, just reload. Ideally, fetch and update table dynamically.
+        location.reload();
+    }
+
+    // Toggle Add User Form
+    document.getElementById('showAddUserFormBtn').addEventListener('click', function() {
+        addUserModal.style.display = 'block';
+        clearMessages();
+    });
+    document.getElementById('cancelAddUserBtn').addEventListener('click', function() {
+        addUserModal.style.display = 'none';
+        addUserForm.reset();
+    });
+
+    // Handle Add User
+    addUserForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        clearMessages();
+        const formData = new FormData(addUserForm);
+        const data = Object.fromEntries(formData.entries());
+
+        if (!data.name || !data.email || !data.password) {
+            showMessage('Name, Email, and Password are required.', 'error');
+            return;
         }
+
+        fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+        .then(({ ok, status, body }) => {
+            if (ok) {
+                showMessage(body.message || 'User added successfully!', 'success');
+                addUserForm.reset();
+                addUserModal.style.display = 'none';
+                refreshPage(); // Reload to see new user
+            } else {
+                showMessage(body.message || `Error adding user (HTTP ${status})`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Add user error:', error);
+            showMessage('An unexpected error occurred while adding the user.', 'error');
+        });
+    });
+
+    // Handle Edit User - Show Modal and Populate
+    // Make sure querySelectorAll and querySelector are specific enough if IDs are not unique
+    document.querySelectorAll('#userManagementArea .edit-user-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            clearMessages(); // This clears user management messages
+            const userId = this.dataset.id;
+            const name = this.dataset.name;
+            const email = this.dataset.email;
+            const status = this.dataset.status;
+
+            // Assuming 'editUserModal' is the ID of the one correct modal
+            document.getElementById('edit_user_id').value = userId;
+            document.getElementById('edit_user_name').value = name;
+            document.getElementById('edit_user_email').value = email;
+            document.getElementById('edit_user_status').value = status;
+            document.getElementById('edit_user_password').value = '';
+            editUserModal.style.display = 'block';
+        });
+    });
+
+    // Handle Cancel Edit User Modal
+    // Ensure this selector is specific to the correct modal if multiple exist
+    document.querySelector('#editUserModal button[type="button"]').addEventListener('click', function() {
+        editUserModal.style.display = 'none';
+        if(editUserForm) editUserForm.reset();
+    });
+
+
+    // Handle Edit User Form Submission
+    if(editUserForm) { // Add null check for editUserForm
+        editUserForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            clearMessages(); // Clears user management messages
+            const userId = document.getElementById('edit_user_id').value;
+        const formData = new FormData(editUserForm);
+        const data = Object.fromEntries(formData.entries());
+
+        // Remove password if it's empty, so it's not sent unless changed
+        if (!data.password) {
+            delete data.password;
+        }
+         if (!data.name || !data.email) {
+            showMessage('Name and Email are required.', 'error');
+            return;
+        }
+
+        fetch(`/api/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+        .then(({ ok, status, body }) => {
+            if (ok) {
+                showMessage(body.message || 'User updated successfully!', 'success');
+                editUserForm.reset();
+                editUserModal.style.display = 'none';
+                refreshPage(); // Reload to see updated user
+            } else {
+                showMessage(body.message || `Error updating user (HTTP ${status})`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Update user error:', error);
+            showMessage('An unexpected error occurred while updating the user.', 'error');
+        });
+    }); // This closes the editUserForm.addEventListener
+    } // This is the an important closing brace for if(editUserForm) that needs to be correctly placed.
+
+    // Handle Delete User
+    document.querySelectorAll('#userManagementArea .delete-user-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            clearMessages(); // Clears user management messages
+            const userId = this.dataset.id;
+            if (confirm(`Are you sure you want to delete user ${userId}? This action cannot be undone.`)) {
+                fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+                .then(({ ok, status, body }) => {
+                    if (ok) {
+                        showMessage(body.message || 'User deleted successfully!', 'success');
+                        refreshPage();
+                    } else {
+                        showMessage(body.message || `Error deleting user (HTTP ${status})`, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Delete user error:', error);
+                    showMessage('An unexpected error occurred while deleting the user.', 'error');
+                });
+            }
+        });
+    });
+
+    // --- Q&A Management JavaScript ---
+    // This section should be at the top level of the script block, not nested.
+    const qaCompanySelect = document.getElementById('qaCompanySelect');
+    const downloadQaBtn = document.getElementById('downloadQaBtn');
+    const uploadQaForm = document.getElementById('uploadQaForm');
+    const qaFileInput = document.getElementById('qaFile');
+
+    function showQaMessage(message, type = 'success') {
+        qaManagementMessages.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'danger'}" role="alert">${message}</div>`;
+    }
+    function clearQaMessages() {
+        qaManagementMessages.innerHTML = '';
     }
 
-    // Placeholder for fetching users if not passed directly or for dynamic updates
-    // function fetchUsers() { /* fetch from /api/users and populate table */ }
-    // if users are not passed directly or need refresh, uncomment and implement:
-    // document.addEventListener('DOMContentLoaded', fetchUsers);
+    if(downloadQaBtn) {
+        downloadQaBtn.addEventListener('click', function() {
+            clearQaMessages();
+            const selectedCompany = qaCompanySelect.value;
+            if (!selectedCompany) {
+                showQaMessage('Please select a company first.', 'error');
+                return;
+            }
+            const downloadUrl = `/admin/download_qa/${selectedCompany}`;
+            // Trigger download by navigating to the URL
+            window.location.href = downloadUrl;
+            // No direct success/error message here as browser handles download.
+            // Can add a small "Download initiated..." message if desired.
+            showQaMessage(`Download initiated for ${selectedCompany} Q&A data. Check your browser downloads.`, 'info');
+        });
+    }
+
+    if(uploadQaForm) {
+        uploadQaForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            clearQaMessages();
+            const selectedCompany = qaCompanySelect.value;
+            if (!selectedCompany) {
+                showQaMessage('Please select a company before uploading.', 'error');
+                return;
+            }
+            if (!qaFileInput.files || qaFileInput.files.length === 0) {
+                showQaMessage('Please select a JSON file to upload.', 'error');
+                return;
+            }
+
+            const file = qaFileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadUrl = `/admin/upload_qa/${selectedCompany}`;
+
+            fetch(uploadUrl, {
+                method: 'POST',
+                body: formData // No 'Content-Type' header needed, browser sets it for FormData
+            })
+            .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+            .then(({ ok, status, body }) => {
+                if (status === 201 || status === 200) { // Success or OK (e.g. for empty file processed)
+                    showQaMessage(body.message || 'File processed successfully!', 'success');
+                    if (body.processed_count > 0 && body.error_count > 0) { // Partial success from 207
+                         showQaMessage(`${body.message}<br>Processed: ${body.processed_count}, Errors: ${body.error_count}.<br>Details:<br>${body.errors.join('<br>')}`, 'warning');
+                    } else if (body.error_count > 0) { // Should be caught by status check but good fallback
+                         showQaMessage(`${body.message}<br>Errors: ${body.error_count}.<br>Details:<br>${body.errors.join('<br>')}`, 'error');
+                    }
+                } else if (status === 207) { // Multi-Status for partial success
+                     showQaMessage(`${body.message}<br>Processed: ${body.processed_count}, Errors: ${body.error_count}.<br>Details:<br>${body.errors.join('<br>')}`, 'warning');
+                }
+                else { // Handle 400 and other errors
+                    let errorMessage = body.message || `Error uploading file (HTTP ${status}).`;
+                    if (body.errors && body.errors.length > 0) {
+                        errorMessage += `<br>Details:<br>${body.errors.join('<br>')}`;
+                    }
+                    showQaMessage(errorMessage, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Upload Q&A error:', error);
+                showQaMessage('An unexpected error occurred during the file upload.', 'error');
+            })
+            .finally(() => {
+                uploadQaForm.reset(); // Clear the file input
+            });
+        });
+    }
+    // The extra closing brace that was here has been removed.
 </script>
 {% endblock %}
