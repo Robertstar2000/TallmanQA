@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Ask AI - Tallman App{% endblock %}
+
+{% block content %}
+<!-- Admin status is now set in base.html -->
+
+<h1>Ask AI (QA Screen)</h1>
+<p>Welcome, {{ session.name }}!</p>
+<form id="qaForm" method="POST" action="{{ url_for('ask_ai_post') }}"> {# Action for non-JS fallback, but JS will override #}
+    <div>
+        <label for="company">Select Company:</label>
+        <select name="company" id="company">
+            <option value="Tallman">Tallman</option>
+            <option value="MCR">MCR</option>
+            <option value="Bradley">Bradley</option>
+        </select>
+    </div>
+    <div>
+        <label for="question_type">Select Question Type:</label>
+        <select name="question_type" id="question_type">
+            <option value="Product">Product</option>
+            <option value="Sales">Sales</option>
+            <option value="General Help">General Help</option>
+            <option value="Tutorial">Tutorial</option>
+            <option value="Default">Default</option>
+        </select>
+    </div>
+    <div>
+        <label for="user_question">Your Question:</label>
+        <textarea name="user_question" id="user_question" rows="4" required></textarea>
+    </div>
+    <div>
+        <button type="submit">Get Answer</button>
+    </div>
+</form>
+
+<div id="answerSection" class="answer-container" style="margin-top: 30px; display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; background-color: #f9f9f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <div class="question-section">
+        <h2 style="color: #2c3e50; margin-bottom: 15px; font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <i class="fas fa-question-circle" style="margin-right: 10px; color: #3498db;"></i>
+            Your Question
+        </h2>
+        <div id="displayedQuestion" style="font-size: 1.1em; margin-bottom: 20px; padding: 10px; background: white; border-radius: 4px; border-left: 4px solid #3498db;"></div>
+    </div>
+
+    <div class="answer-section" style="margin: 20px 0;">
+        <h2 style="color: #2c3e50; margin-bottom: 15px; font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <i class="fas fa-robot" style="margin-right: 10px; color: #2ecc71;"></i>
+            Answer
+        </h2>
+        <div id="llmAnswer" style="font-size: 1.1em; line-height: 1.6; padding: 15px; background: white; border-radius: 4px; border-left: 4px solid #2ecc71; white-space: pre-wrap;">
+            Loading answer...
+        </div>
+    </div>
+
+    <div id="copyButtonContainer" style="display: flex; align-items: center; margin: 15px 0; gap: 10px;">
+        <button id="copyAnswerButton" class="btn-copy" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+            <i class="far fa-copy"></i>
+            <span>Copy Answer</span>
+        </button>
+    </div>
+
+    <div class="sources-section" style="margin-top: 25px;">
+        <h3 style="color: #2c3e50; margin-bottom: 10px; font-size: 1.2em;">
+            <i class="fas fa-book" style="margin-right: 8px; color: #9b59b6;"></i>
+            Sources & References
+        </h3>
+        <div id="snippetsArea" style="background: white; border-radius: 4px; padding: 10px; border: 1px solid #eee; max-height: 300px; overflow-y: auto;">
+            <p style="color: #7f8c8d; font-style: italic;">Relevant information will appear here...</p>
+        </div>
+    </div>
+</div>
+
+<div id="correctionModule" style="margin-top: 20px; display: none; border: 1px solid #eee; padding: 10px;">
+    <p>Is this answer incorrect or incomplete?</p>
+    {% if session.status == 'admin' %}
+        <button id="showCorrectionFormButton">Help Improve This Answer (Admin)</button>
+        <form id="correctionForm" style="display:none; margin-top:10px;">
+            <input type="hidden" id="original_question_for_correction" name="original_question">
+            <input type="hidden" id="incorrect_answer_for_correction" name="incorrect_answer">
+            <input type="hidden" id="company_for_correction" name="company">
+            <div>
+                <label for="user_correction_text">Your Correction/New Information:</label>
+                <textarea name="user_correction_text" id="user_correction_text" rows="4" required></textarea>
+            </div>
+            <div>
+                <button type="submit">Submit Correction</button>
+            </div>
+        </form>
+        <div id="correctedAnswerSection" style="margin-top: 10px; display: none;">
+            <h4>Revised Answer:</h4>
+            <p id="revisedLlmAnswer"></p>
+        </div>
+    {% else %}
+        <p><em>If you believe this answer needs improvement, please contact an administrator.</em></p>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+    document.getElementById('qaForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const company = document.getElementById('company').value;
+        const question_type = document.getElementById('question_type').value;
+        const user_question = document.getElementById('user_question').value.trim();
+
+        // Validate input
+        if (!user_question) {
+            alert('Please enter a question.');
+            return;
+        }
+
+        // Show loading state
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.innerHTML;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+        // Show answer section with loading state
+        const answerSection = document.getElementById('answerSection');
+        const llmAnswer = document.getElementById('llmAnswer');
+        const snippetsArea = document.getElementById('snippetsArea');
+        
+        // Clear previous results
+        answerSection.style.display = 'block';
+        document.getElementById('displayedQuestion').textContent = user_question;
+        llmAnswer.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating answer...';
+        snippetsArea.innerHTML = '<p style="color: #7f8c8d; font-style: italic;">Gathering relevant information...</p>';
+        document.getElementById('copyButtonContainer').style.display = 'none';
+        
+        // Hide correction modules
+        document.getElementById('correctionModule').style.display = 'none';
+        document.getElementById('correctedAnswerSection').style.display = 'none';
+
+        try {
+            const response = await fetch("{{ url_for('ask_ai_post') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ 
+                    company: company, 
+                    question_type: question_type, 
+                    user_question: user_question 
+                })
+            });
+
+            const data = await response.json();
+            console.log('API Response:', data);
+
+            // Show the answer section if it's not already visible
+            const answerSection = document.getElementById('answerSection');
+            answerSection.style.display = 'block';
+            
+            // Update the question display
+            document.getElementById('displayedQuestion').textContent = user_question;
+            
+            if (response.ok && data.status === 'success') {
+                // Display the answer with proper formatting
+                const answerElement = document.getElementById('llmAnswer');
+                if (data.answer) {
+                    // Convert markdown-style formatting to HTML
+                    let formattedAnswer = data.answer
+                        .replace(/\n/g, '<br>') // Convert newlines to <br>
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Italic
+                    
+                    answerElement.innerHTML = formattedAnswer;
+                } else {
+                    answerElement.innerHTML = '<em>No answer could be generated. Please try rephrasing your question.</em>';
+                }
+                
+                // Display snippets if available
+                const snippetsArea = document.getElementById('snippetsArea');
+                const refs = data.references;
+if (refs && Array.isArray(refs) && refs.length > 0) {
+    snippetsArea.innerHTML = refs.map((s, i) =>
+        `<div class="snippet" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #3498db;">
+            <b>Snippet ${i+1}:</b> Q: ${s.question}<br><b>A:</b> ${s.answer}
+        </div>`
+    ).join('');
+} else if (data.references_formatted && typeof data.references_formatted === 'string' && data.references_formatted.trim() !== "") {
+    // fallback to formatted string if present
+    snippetsArea.innerHTML = `<div class="snippet">${data.references_formatted.replace(/\n/g, '<br>')}</div>`;
+} else {
+    snippetsArea.innerHTML = '<p style="color: #7f8c8d; font-style: italic;">No relevant information found in the knowledge base.</p>';
+}
+                
+                // Show the copy button
+                document.getElementById('copyButtonContainer').style.display = 'flex';
+
+                // Set up correction module for admin
+                // Check admin status from body data attribute
+                const isAdmin = document.body.getAttribute('data-is-admin') === 'true';
+                if (isAdmin) {
+                    const correctionModule = document.getElementById('correctionModule');
+                    if (correctionModule) {
+                        correctionModule.style.display = 'block';
+                    }
+                    
+                    const showCorrectionBtn = document.getElementById('showCorrectionFormButton');
+                    if (showCorrectionBtn) {
+                        showCorrectionBtn.style.display = 'inline-block';
+                        
+                        // Update the button to redirect to the correction page
+                        showCorrectionBtn.onclick = function() {
+                            // Get the first snippet if available
+                            const firstSnippet = data.raw_snippets && data.raw_snippets.length > 0 
+                                ? data.raw_snippets[0].answer 
+                                : data.answer || '';
+                                
+                            // Build the URL with all necessary parameters
+                            const params = new URLSearchParams({
+                                original_question: user_question,
+                                incorrect_answer: firstSnippet,
+                                company: company,
+                                raw_snippets: JSON.stringify(data.raw_snippets || [])
+                            });
+                            
+                            // Redirect to the correction page
+                            window.location.href = `/correct_answer_page?${params.toString()}`;
+                        };
+                    }
+                }
+            } else {
+                // Handle error response
+                let errorMessage = 'An error occurred while processing your request.';
+                if (data && data.message) {
+                    errorMessage = data.message;
+                } else if (!response.ok) {
+                    errorMessage = `Server returned ${response.status} ${response.statusText}`;
+                }
+                
+                if (response.status === 401 && data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+                
+                document.getElementById('llmAnswer').textContent = 'Error: ' + errorMessage;
+                
+                const snippetsArea = document.getElementById('snippetsArea');
+                if (data && data.retrieved_snippets_formatted) {
+                    const formattedSnippets = typeof data.retrieved_snippets_formatted === 'string' 
+                        ? data.retrieved_snippets_formatted.replace(/\\n/g, '<br>') 
+                        : 'No context available.';
+                    snippetsArea.innerHTML = `<div class="snippet">${formattedSnippets}</div>`;
+                } else {
+                    snippetsArea.innerHTML = '<div class="alert alert-warning">No additional information available.</div>';
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('llmAnswer').textContent = 'Error: ' + (error.message || 'An unexpected error occurred');
+            document.getElementById('snippetsArea').innerHTML = 
+                '<div class="alert alert-danger">Please check the console for more details.</div>';
+            document.getElementById('answerSection').style.display = 'block';
+        } finally {
+            // Restore button state
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    });
+
+    // Admin-specific functionality
+    (function() {
+        // Admin-specific functionality initialization
+        const isAdmin = document.body.getAttribute('data-is-admin') === 'true';
+        if (!isAdmin) return;
+        
+        // Remove the old inline form since we're now redirecting to a dedicated page
+        const correctionModule = document.getElementById('correctionModule');
+        if (correctionModule) {
+            // Keep the button but remove the form
+            const form = correctionModule.querySelector('form');
+            if (form) {
+                form.remove();
+            }
+            
+            // Update the button text to be more descriptive
+            const button = correctionModule.querySelector('button');
+            if (button) {
+                button.textContent = 'Help Improve This Answer';
+            }
+            
+            // Show the module
+            correctionModule.style.display = 'block';
+        }
+    })();
+
+    // Set up copy answer button
+    const copyButton = document.getElementById('copyAnswerButton');
+    if (copyButton) {
+        copyButton.addEventListener('click', function() {
+            const question = document.getElementById('displayedQuestion').textContent;
+            const answer = document.getElementById('llmAnswer').textContent;
+            const textToCopy = `Question: ${question}\n\nAnswer: ${answer}`;
+            
+            // Change button style to show success
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            this.style.background = '#2ecc71';
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                this.innerHTML = originalText;
+                this.style.background = '#3498db';
+            }, 2000);
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textToCopy).catch(function(err) {
+                console.error('Error copying text:', err);
+                alert('Error copying text. Please check console for details.');
+            });
+        });
+    }
+
+</script>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Correct Answer - Tallman App{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Correct Answer Page</h1>
+
+    {% if session.status == 'admin' %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <p class="card-text">Use this page to submit a correction for a previously generated answer. You can also initiate corrections directly from the main Q&A screen after an answer is displayed.</p>
+            </div>
+        </div>
+
+        <form id="detailedCorrectionForm" class="needs-validation" novalidate>
+            <div class="mb-3">
+                <label for="company_for_correction" class="form-label">Company:</label>
+                <select name="company" id="company_for_correction" class="form-select" required>
+                    <option value="Tallman" {% if company == 'Tallman' %}selected{% endif %}>Tallman</option>
+                    <option value="MCR" {% if company == 'MCR' %}selected{% endif %}>MCR</option>
+                    <option value="Bradley" {% if company == 'Bradley' %}selected{% endif %}>Bradley</option>
+                </select>
+                <div class="invalid-feedback">
+                    Please select a company.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="original_q" class="form-label">Original Question:</label>
+                <input type="text" id="original_q" class="form-control" name="original_question" 
+                       value="{{ original_question if original_question else '' }}" required readonly>
+                <div class="invalid-feedback">
+                    Original question is required.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="incorrect_a" class="form-label">Previously Generated Answer (Incorrect/Incomplete):</label>
+                <textarea id="incorrect_a" class="form-control" name="incorrect_answer" rows="5" required readonly>{{ incorrect_answer if incorrect_answer else '' }}</textarea>
+                <div class="invalid-feedback">
+                    Previous answer is required.
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="user_correction" class="form-label">Your Full Corrected Answer or New Information:</label>
+                <textarea id="user_correction" class="form-control" name="user_correction_text" rows="8" required></textarea>
+                <div class="form-text">
+                    Please provide the complete corrected answer. This will be used to update our knowledge base.
+                </div>
+                <div class="invalid-feedback">
+                    Please provide a corrected answer.
+                </div>
+            </div>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{{ url_for('ask_ai_get') }}" class="btn btn-secondary me-md-2">Back to Questions</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check-circle me-1"></i> Submit Correction
+                </button>
+            </div>
+        </form>
+
+        <div id="submissionResult" class="mt-4">
+            <!-- Messages about submission status will appear here -->
+        </div>
+    {% else %}
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Access Denied</h4>
+            <p>You do not have permission to access this page. This function is for administrators only.</p>
+            <hr>
+            <p class="mb-0">Please contact an administrator if you believe this is an error.</p>
+        </div>
+    {% endif %}
+</div> <!-- Close container -->
+
+{% endblock %}
+
+{% block scripts_extra %}
+{% if session.status == 'admin' %}
+<script>
+    // Enable Bootstrap form validation
+    (function () {
+        'use strict'
+        
+        // Fetch the form we want to apply custom Bootstrap validation styles to
+        const form = document.getElementById('detailedCorrectionForm');
+        
+        if (form) {
+            // Add a submit event listener
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Check if the form is valid
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated');
+                    return;
+                }
+
+                // Get form elements
+                const original_question = document.getElementById('original_q').value;
+                const incorrect_answer = document.getElementById('incorrect_a').value;
+                const user_correction_text = document.getElementById('user_correction').value;
+                const company = document.getElementById('company_for_correction').value;
+                const submissionResultDiv = document.getElementById('submissionResult');
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+
+                // Show loading state
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+                
+                // Clear previous messages
+                submissionResultDiv.innerHTML = '';
+
+                try {
+                    const response = await fetch("{{ url_for('correct_answer_post') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ 
+                            original_question, 
+                            incorrect_answer, 
+                            user_correction_text, 
+                            company 
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.status === 'success') {
+                        // Show success message with the new answer
+                        submissionResultDiv.innerHTML = `
+                            <div class="alert alert-success" role="alert">
+                                <h4 class="alert-heading">Success!</h4>
+                                <p>${data.message || 'Correction submitted successfully!'}</p>
+                                <hr>
+                                <h5>New Answer:</h5>
+                                <div class="p-3 mb-2 bg-light rounded">
+                                    ${data.new_answer.replace(/\n/g, '<br>')}
+                                </div>
+                                <p class="mb-0">The knowledge base has been updated with this correction.</p>
+                            </div>
+                        `;
+                        
+                        // Reset the form
+                        form.reset();
+                    } else {
+                        let errorMessage = data.message || 'Error submitting correction.';
+                        if (response.status === 401 && data.redirect_url) {
+                            window.location.href = data.redirect_url;
+                            return;
+                        }
+                        
+                        submissionResultDiv.innerHTML = `
+                            <div class="alert alert-danger" role="alert">
+                                <h4 class="alert-heading">Error</h4>
+                                <p>${errorMessage}</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    submissionResultDiv.innerHTML = `
+                        <div class="alert alert-danger" role="alert">
+                            <h4 class="alert-heading">Error</h4>
+                            <p>An unexpected error occurred while submitting the correction.</p>
+                            <p class="mb-0">Please check the console for more details.</p>
+                        </div>
+                    `;
+                } finally {
+                    // Restore button state
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                    
+                    // Scroll to the result
+                    submissionResultDiv.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, false);
+        }
+    })();
+</script>
+{% endif %}
+{% endblock %}

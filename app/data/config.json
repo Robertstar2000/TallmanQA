@@ -1,0 +1,21 @@
+{
+    "llm_provider": "openai",
+    "ollama_endpoint": "http://localhost:11434/api/generate",
+    "selected_model": "llama3",
+    "ldap": {
+        "enabled": true,
+        "server": "10.10.20.253",
+        "port": 389,
+        "use_ssl": true,
+        "base_dn": "cn=LDAP,DC=com",
+        "user_dn": "ou=users",
+        "group_dn": "ou=groups",
+        "bind_user_dn": "cn=LDAP,DC=com",
+        "bind_user_password": "ebGGAm77kk",
+        "user_rdn_attr": "cn",
+        "user_login_attr": "uid",
+        "user_object_filter": "(objectClass=inetOrgPerson)",
+        "group_object_filter": "(objectClass=groupOfNames)",
+        "group_member_attr": "member"
+    }
+}

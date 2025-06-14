@@ -1,0 +1,16 @@
+[
+    {
+        "id": "admin001",
+        "name": "bmills",
+        "email": "bmills@tallmanequipment.com",
+        "status": "admin",
+        "hashed_password": "scrypt:32768:8:1$5ACikI16TwVv53v9$0ca7a98a4bb8a7d2584ea48aa288a8f209f906cdfb8154cf7cde86ea8ac55ad4c8fa4f47bbaef5cb5a7783c77a99a3f1918be7de3d37f4a53158df4c7f4f504b"
+    },
+    {
+        "id": "user001",
+        "name": "Regular User",
+        "email": "user@example.com",
+        "status": "regular",
+        "hashed_password": "pbkdf2:sha256:600000$1AbCdEfGhIjKlMnOp$d8f82af9d9354e14b3e3f596435e5a79ae53182703758e90f9837f507370f1b1"
+    }
+]
