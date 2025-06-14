@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Correct Answer - Tallman App{% endblock %}
+
+{% block content %}
+<h1>Correct Answer Page (Screen 2)</h1>
+
+{% if session.status == 'admin' %}
+    <p>Use this page to submit a correction for a previously generated answer. You can also initiate corrections directly from the main Q&A screen after an answer is displayed.</p>
+
+    <form id="detailedCorrectionForm">
+        <div>
+            <label for="company_for_correction">Company:</label>
+            <select name="company" id="company_for_correction">
+                <option value="Tallman" {% if company == 'Tallman' %}selected{% endif %}>Tallman</option>
+                <option value="MCR" {% if company == 'MCR' %}selected{% endif %}>MCR</option>
+                <option value="Bradley" {% if company == 'Bradley' %}selected{% endif %}>Bradley</option>
+            </select>
+        </div>
+        <div>
+            <label for="original_q">Original Question:</label>
+            <input type="text" id="original_q" class="form-control" name="original_question" value="{{ original_question if original_question else '' }}">
+        </div>
+        <div>
+            <label for="incorrect_a">Previously Generated Answer (Incorrect/Incomplete):</label>
+            <textarea id="incorrect_a" class="form-control" name="incorrect_answer" rows="3">{{ incorrect_answer if incorrect_answer else '' }}</textarea>
+        </div>
+        <div>
+            <label for="user_correction">Your Full Corrected Answer or New Information:</label>
+            <textarea id="user_correction" class="form-control" name="user_correction_text" rows="5" required></textarea>
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary">Submit Detailed Correction</button>
+        </div>
+    </form>
+
+    <div id="submissionResult" style="margin-top:20px;">
+        <!-- Messages about submission status can go here -->
+    </div>
+{% else %}
+    <p>You do not have permission to access this page. This function is for administrators only.</p>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts_extra %}
+{% if session.status == 'admin' %}
+<script>
+    document.getElementById('detailedCorrectionForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const original_question = document.getElementById('original_q').value;
+        const incorrect_answer = document.getElementById('incorrect_a').value;
+        const user_correction_text = document.getElementById('user_correction').value;
+        const company = document.getElementById('company_for_correction').value;
+        const submissionResultDiv = document.getElementById('submissionResult');
+
+        submissionResultDiv.innerHTML = ''; // Clear previous messages
+
+        if (!original_question || !incorrect_answer || !user_correction_text || !company) {
+            submissionResultDiv.innerHTML = '<p style="color:red;">All fields are required.</p>';
+            return;
+        }
+
+        const response = await fetch("{{ url_for('correct_answer_post') }}", { // Ensure this route matches your Flask app
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ original_question, incorrect_answer, user_correction_text, company })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            submissionResultDiv.innerHTML = `<p style="color:green;">${data.message || 'Correction submitted successfully!'}</p>`;
+            submissionResultDiv.innerHTML += `<p><strong>New Answer:</strong> ${data.new_answer}</p>`;
+            // Optionally clear the form or redirect
+            // document.getElementById('detailedCorrectionForm').reset();
+        } else {
+            let errorMessage = data.message || 'Error submitting correction.';
+            if (response.status === 401 && data.redirect_url) {
+                alert('Session expired or login required. Redirecting to login page.');
+                window.location.href = data.redirect_url;
+                return;
+            }
+            submissionResultDiv.innerHTML = `<p style="color:red;">Error: ${errorMessage}</p>`;
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
