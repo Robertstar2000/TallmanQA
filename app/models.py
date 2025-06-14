@@ -1,7 +1,12 @@
 from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask_login import UserMixin
 
 class User(UserMixin):
+=======
+
+class User:
+
     def __init__(self, id, name, email, status, hashed_password):
         self.id = id
         self.name = name
@@ -15,9 +20,11 @@ class User(UserMixin):
     def check_password(self, password):
         return check_password_hash(self.hashed_password, password)
 
+
     def is_admin(self):
         return self.status == 'admin'
 
+in
     def to_dict(self):
         return {
             'id': self.id,

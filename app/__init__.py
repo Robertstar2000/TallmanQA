@@ -1,11 +1,16 @@
 from flask import Flask
+
 from flask_login import LoginManager
 
 from .utils import load_users, load_config, load_all_qa_into_chroma
 from .models import User
 
+from .utils import load_users, verify_password, load_all_qa_into_chroma # Assuming verify_password might be used by routes
+
+
 app = Flask(__name__)
 app.secret_key = 'your_very_secret_key_here_change_me' # Replace with a strong, environment-based key in production
+
 
 # --- Authentication Setup ---
 login_manager = LoginManager(app)
@@ -64,13 +69,21 @@ if config.get('ldap', {}).get('enabled', False) and config.get('ldap', {}).get('
             
         return user
 
+=======
+
 # Import routes after app initialization to avoid circular imports
 from . import routes
 
 print("Attempting to load all Q&A data into ChromaDB at startup...")
 try:
+
     # The EmbeddingManager in utils.py will be used to get or create the embedding function as needed
     # This ensures we always have an embedding function available when needed
+
+    # Make sure sentence_transformer_ef is initialized in utils before this is called
+    # or that load_all_qa_into_chroma handles its absence.
+    # Based on previous utils.py, it should handle it.
+
     load_all_qa_into_chroma()
     print("ChromaDB loading process initiated. Check console for details and completion.")
 except Exception as e:

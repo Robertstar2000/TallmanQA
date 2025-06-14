@@ -3,12 +3,16 @@ import os
 import uuid
 import chromadb
 from chromadb.utils import embedding_functions
+
 import openai
 import requests
 import json # For Ollama streaming response
 from flask import current_app # To access app.config # Added for LLM integration
 import traceback # Add for detailed error logging
 import json
+
+import openai # Added for LLM integration
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.models import User, QA
@@ -18,6 +22,7 @@ from app.data.Type import PROMPT_TEMPLATES # Added for LLM integration
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if openai.api_key is None:
     print("Warning: OPENAI_API_KEY environment variable not set. LLM functions will not work.")
+
 
 # Build paths that work from both app directory and root directory
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -111,6 +116,23 @@ except ImportError as e:
     print(f"[FATAL] sentence-transformers package not available: {e}")
     print("[FATAL] Please install with: pip install sentence-transformers")
     raise
+=======
+USER_FILE = 'app/data/User.json'
+TALLMAN_QA_FILE = 'app/data/Tallman_QA.txt'
+MCR_QA_FILE = 'app/data/MCR_QA.txt'
+BRADLEY_QA_FILE = 'app/data/Bradley_QA.txt'
+
+CHROMA_DATA_PATH = "app/data/chroma_db"
+client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2" # "all-mpnet-base-v2" is another good one
+
+try:
+    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=DEFAULT_EMBEDDING_MODEL)
+except Exception as e:
+    print(f"Error initializing SentenceTransformerEmbeddingFunction: {e}")
+    print("ChromaDB embedding functions might not work. Ensure sentence-transformers is installed and model is accessible.")
+    sentence_transformer_ef = None # Fallback or handle error appropriately
+
 
 
 def hash_password(password: str) -> str:
@@ -122,14 +144,21 @@ def verify_password(hashed_password: str, password: str) -> bool:
 def load_users() -> list[User]:
     try:
         with open(USER_FILE, 'r') as f:
+
             content = f.read().strip()
             if not content:
                 return []
             data = json.loads(content)
+
+            if f.tell() == 0:
+                return []
+            data = json.load(f)
+
             if not data:
                 return []
     except FileNotFoundError:
         return []
+
     except json.JSONDecodeError as e:
         print(f"Error parsing {USER_FILE}: {e}")
         return []
@@ -139,16 +168,32 @@ def load_users() -> list[User]:
         user_data_list = data
     elif isinstance(data, dict):
         user_data_list = [data]
+
+
+    users = []
+    if isinstance(data, dict) and data:
+        if data:
+            user_data_list = [data]
+        else:
+            return []
+    elif isinstance(data, list):
+        user_data_list = data
+
     else:
         return []
 
     for user_data in user_data_list:
+
         if user_data:  # Only process non-empty user data
             try:
                 users.append(User.from_dict(user_data))
             except Exception as e:
                 print(f"Error creating user from data {user_data}: {e}")
     
+
+        if user_data:
+            users.append(User.from_dict(user_data))
+
     return users
 
 def save_users(users: list[User]) -> None:
@@ -211,6 +256,7 @@ def append_qa_pair(company: str, question: str, answer: str, is_update: bool = F
         f.write(f"{question}\n")
         f.write(f"{answer}\n\n")
 
+
     try:
         collection = get_or_create_collection(company)
         add_qa_to_collection(collection, new_qa)
@@ -219,9 +265,21 @@ def append_qa_pair(company: str, question: str, answer: str, is_update: bool = F
         print(f"Error adding appended Q&A to ChromaDB for {company}: {e}")
         print(f"Will continue without adding to ChromaDB. Data was still written to file.")
 
+    if sentence_transformer_ef is not None:
+        try:
+            collection = get_or_create_collection(company)
+            add_qa_to_collection(collection, new_qa)
+            print(f"Appended Q&A for {company} to file and ChromaDB.")
+        except Exception as e:
+            print(f"Error adding appended Q&A to ChromaDB for {company}: {e}")
+    else:
+        print("ChromaDB embedding function not available. Skipping add to collection for appended Q&A.")
+
+
     return new_qa
 
 def get_or_create_collection(company_name: str) -> chromadb.api.models.Collection.Collection:
+
     # Get embedding function using the EmbeddingManager
     try:
         # Get the embedding manager instance
@@ -233,6 +291,15 @@ def get_or_create_collection(company_name: str) -> chromadb.api.models.Collectio
         collection = client.get_or_create_collection(
             name=collection_name,
             embedding_function=embedding_function
+
+    if sentence_transformer_ef is None:
+        raise RuntimeError("SentenceTransformerEmbeddingFunction not initialized. Cannot get or create collection.")
+    collection_name = f"{company_name.lower()}_qa"
+    try:
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=sentence_transformer_ef
+
         )
         return collection
     except Exception as e:
@@ -252,6 +319,7 @@ def add_qa_to_collection(collection: chromadb.api.models.Collection.Collection, 
         )
     except Exception as e:
         print(f"Error upserting QA item {qa_item.id} into collection {collection.name}: {e}")
+
 
 
 def query_collection(collection: chromadb.api.models.Collection.Collection, query_text: str, n_results: int = 3) -> list[dict]:
@@ -278,10 +346,15 @@ def query_collection(collection: chromadb.api.models.Collection.Collection, quer
             print(f"[DEBUG] Collection {collection.name} is empty. Returning no results.")
             return []
 
+
+def query_collection(collection: chromadb.api.models.Collection.Collection, query_text: str, n_results: int = 3) -> list[dict]:
+    try:
+
         results = collection.query(
             query_texts=[query_text],
             n_results=n_results
         )
+
         
         # The 'metadatas' key contains a list of lists of our stored metadata dictionaries.
         # We want the first (and only) list inside.
@@ -317,9 +390,35 @@ def load_all_qa_into_chroma():
             collection = get_or_create_collection(company)
             print(f"[{company}] Successfully got/created collection: {collection.name}") # Restoring verbose log
 
+
+        if results and results.get('metadatas') and results['metadatas'][0]:
+            return results['metadatas'][0]
+        return []
+    except Exception as e:
+        print(f"Error querying collection {collection.name} with text '{query_text}': {e}")
+        return []
+
+def load_all_qa_into_chroma():
+    if sentence_transformer_ef is None:
+        print("SentenceTransformerEmbeddingFunction not initialized. Cannot load Q&A into ChromaDB.")
+        return
+
+    companies = ["Tallman", "MCR", "Bradley"]
+    print("Starting to load all Q&A data into ChromaDB...")
+    for company in companies:
+        print(f"Processing company: {company}")
+        try:
+            qa_data = load_qa_data(company)
+            if not qa_data:
+                print(f"No Q&A data found for {company}. Skipping.")
+                continue
+
+            collection = get_or_create_collection(company)
+
             ids_batch = []
             documents_batch = []
             metadatas_batch = []
+
 
             print(f"[{company}] Preparing batches for {len(qa_data)} Q&A items...") # Restoring verbose log
             for i, qa_item in enumerate(qa_data):
@@ -372,6 +471,25 @@ def load_all_qa_into_chroma():
             print(f"[{company}] An unexpected error occurred while loading Q&A data into ChromaDB for {company}: {e}", flush=True)
             traceback.print_exc()
 
+            for qa_item in qa_data:
+                if not qa_item.id:
+                    qa_item.id = uuid.uuid4().hex
+                ids_batch.append(qa_item.id)
+                documents_batch.append(qa_item.question)
+                metadatas_batch.append(qa_item.to_dict())
+
+            if ids_batch:
+                collection.upsert(ids=ids_batch, documents=documents_batch, metadatas=metadatas_batch)
+                print(f"Successfully loaded {len(ids_batch)} Q&A items into ChromaDB for {company}.")
+            else:
+                print(f"No new Q&A items to load for {company} after processing.")
+
+        except ValueError as ve:
+            print(f"Configuration error for {company}: {ve}")
+        except Exception as e:
+            print(f"An error occurred while loading Q&A data for {company} into ChromaDB: {e}")
+
+
     print("Finished loading all Q&A data into ChromaDB.")
 
 # LLM Integration Functions
@@ -386,6 +504,7 @@ def format_snippets_for_llm(snippets: list[dict]) -> str:
         answer = snippet_dict.get('answer', 'N/A')
         formatted_string += f"Snippet {i+1}: Q: {question} A: {answer}\n"
     return formatted_string.strip()
+
 
 def get_llm_answer(user_question: str, company: str, question_type: str, context_snippets: list[dict], llm_provider: str, ollama_endpoint: str = None, selected_model: str = None) -> str:
     print(f"[LLM_DEBUG] get_llm_answer called with question: '{user_question[:50]}...', company: {company}, type: {question_type}, provider: {llm_provider}", flush=True)
@@ -469,20 +588,64 @@ def get_llm_answer(user_question: str, company: str, question_type: str, context
 def get_corrected_llm_answer(original_question: str, incorrect_answer: str, user_correction_text: str, company: str) -> str:
     if not openai.api_key or not openai.api_key.strip():
         return "LLM correction not available. Using your correction directly: " + user_correction_text
+=======
+def get_llm_answer(user_question: str, company: str, question_type: str, context_snippets: list[dict]) -> str:
+    if not openai.api_key:
+        return "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+
+    template = PROMPT_TEMPLATES.get(question_type, PROMPT_TEMPLATES["Default"])
+    formatted_snippets = format_snippets_for_llm(context_snippets)
+
+    final_prompt = template.format(user_question=user_question, context_snippets=formatted_snippets)
 
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are a helpful assistant for the {company} company. A user is correcting an answer you provided."},
-                {"role": "user", "content": f"Original question: {original_question}\n\nOriginal answer: {incorrect_answer}\n\nUser's correction: {user_correction_text}\n\nPlease provide an improved answer based on the user's correction."}
+                {"role": "system", "content": f"You are a helpful assistant for the {company} company."},
+                {"role": "user", "content": final_prompt}
             ]
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
+        print(f"Error calling OpenAI API: {e}")
+        return "Error generating answer from LLM."
+
+def get_corrected_llm_answer(original_question: str, incorrect_answer: str, user_correction_text: str, company: str) -> str:
+    if not openai.api_key:
+        return "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+
+    template = PROMPT_TEMPLATES["Correct"]
+    final_prompt = template.format(
+        user_question=original_question,
+        incorrect_answer=incorrect_answer,
+        user_correction_text=user_correction_text
+    )
+
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+
+                {"role": "system", "content": f"You are a helpful assistant for the {company} company. A user is correcting an answer you provided."},
+                {"role": "user", "content": f"Original question: {original_question}\n\nOriginal answer: {incorrect_answer}\n\nUser's correction: {user_correction_text}\n\nPlease provide an improved answer based on the user's correction."}
+
+                {"role": "system", "content": f"You are a helpful assistant for the {company} company, tasked with correcting a previous answer based on user feedback."},
+                {"role": "user", "content": final_prompt}
+
+            ]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+
         print(f"Error in get_corrected_llm_answer: {e}")
         # Fall back to using the user's correction directly if LLM fails
         return "Using your correction directly: " + user_correction_text
+
+        print(f"Error calling OpenAI API for correction: {e}")
+        return "Error generating corrected answer from LLM."
+
 
 # Note for environment setup:
 # Ensure 'chromadb', 'sentence-transformers', and 'openai' are installed.

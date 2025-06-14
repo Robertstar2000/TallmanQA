@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{% block title %}Tallman Corp Assistant{% endblock %}</title>
@@ -18,12 +19,25 @@
     {% block head_extra %}{% endblock %}
 </head>
 <body data-is-admin="{{ 'true' if session.get('status') == 'admin' else 'false' }}">
+=======
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Tallman Corp Assistant{% endblock %}</title>
+    <!-- Example: Link to a common stylesheet -->
+    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> -->
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
     <nav>
         <ul>
             <li><a href="{{ url_for('index') }}">Home</a></li>
             {% if session.user_id %}
+
                 <li><a href="{{ url_for('ask_ai_get') }}">Ask AI</a></li>
                 <li><a href="{{ url_for('correct_answer_page_get') }}">Correct Answer</a></li>
+
+                <li><a href="{{ url_for('ask_ai') }}">Ask AI</a></li>
+                <li><a href="{{ url_for('correct_answer') }}">Correct Answer</a></li>
+
                 {% if session.status == 'admin' %}
                         <li><a href="{{ url_for('manage_users') }}">Admin Panel</a></li>
                 {% endif %}
@@ -44,6 +58,7 @@
             </div>
           {% endif %}
         {% endwith %}
+
 
     <div id="toast-container"></div>
     
@@ -74,6 +89,16 @@
     
     <!-- JavaScript -->
     <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; Tallman Corporation</p>
+    </footer>
+
     {% block scripts_extra %}{% endblock %}
 </body>
 </html>

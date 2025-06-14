@@ -175,6 +175,7 @@ Defines the application's URL endpoints and their corresponding logic.
 
 -   **`app/data/chroma_db/`**: This directory is used by ChromaDB to persist its database files. It contains SQLite files and other data necessary for ChromaDB's operation. This directory should typically be included in `.gitignore` if it becomes large or contains sensitive embeddings, but for this project, its existence is noted.
 
+
 ## LDAP Authentication
 
 TallmanChat supports user authentication via an external LDAP directory. This allows users to log in with their existing corporate credentials, centralizing user management.
@@ -294,6 +295,7 @@ TallmanChat can use Ollama to run local LLMs instead of OpenAI's API. This is es
 - **Model Selection**: Start with smaller models (like mistral-7b) and only move to larger models if needed for better quality.
 - **GPU Acceleration**: For better performance, ensure you have CUDA-compatible GPU and proper drivers installed.
 
+
 ## Installation and Setup
 
 Follow these steps to set up and run TallmanChat locally:
@@ -328,8 +330,9 @@ Follow these steps to set up and run TallmanChat locally:
 5.  **Set Up Environment Variables:**
     The application requires an OpenAI API key to function. Create a `.env` file in the root directory of the project (ensure this file is listed in your `.gitignore` to prevent committing secrets).
     Add your OpenAI API key to the `.env` file:
-    ```
-    OPENAI_API_KEY=''
+
+    OPENAI_API_KEY='your_openai_api_key_here'
+
     ```
     The application (`app/utils.py`) will load this key using `os.getenv("OPENAI_API_KEY")`. (Note: The current code directly uses `os.getenv`. For `.env` file loading, a library like `python-dotenv` would be used, which is included in `requirements.txt`. The app should be updated or it should be noted that the environment variable must be set in the system globally if `python-dotenv` is not used to explicitly load the `.env` file.)
 
@@ -404,16 +407,22 @@ Follow these steps to set up and run TallmanChat locally:
     This will populate the `app/data/chroma_db` directory.
 
 9.  **Run the Application:**
+
     ```powershell
     python run.py
+
+    ```bash
+    python app/app.py>>>>>>> main
     ```
     The application should now be running (by default, on `http://0.0.0.0:5000` or `http://127.0.0.1:5000`).
 
 ## How to Use
+
 Run from the root directory:
 ```powershell
 python run.py
 ```
+
 
 1.  **Access the Application:** Open your web browser and navigate to `http://127.0.0.1:5000`.
 2.  **Login:** You will be redirected to the login page. Use the credentials you set up in `User.json` (e.g., `admin@example.com` and the password you chose).

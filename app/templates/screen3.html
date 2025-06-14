@@ -149,6 +149,7 @@
     </div>
 </div>
 
+
 <hr class="my-5"> <!-- Separator -->
 
 <div id="llmConfigArea" class="mt-4">
@@ -236,11 +237,14 @@
 </div>
 
 
+
 {% endblock %}
 
 {% block scripts_extra %}
 <script>
+
 document.addEventListener('DOMContentLoaded', function() {
+
     const userManagementMessages = document.getElementById('userManagementMessages'); // User management messages
     const qaManagementMessages = document.getElementById('qaManagementMessages'); // Q&A management messages
     const addUserModal = document.getElementById('addUserModal');
@@ -273,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle Add User
+
     if (addUserForm) {
         addUserForm.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -332,6 +337,40 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    addUserForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        clearMessages();
+        const formData = new FormData(addUserForm);
+        const data = Object.fromEntries(formData.entries());
+
+        if (!data.name || !data.email || !data.password) {
+            showMessage('Name, Email, and Password are required.', 'error');
+            return;
+        }
+
+        fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+        .then(({ ok, status, body }) => {
+            if (ok) {
+                showMessage(body.message || 'User added successfully!', 'success');
+                addUserForm.reset();
+                addUserModal.style.display = 'none';
+                refreshPage(); // Reload to see new user
+            } else {
+                showMessage(body.message || `Error adding user (HTTP ${status})`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Add user error:', error);
+            showMessage('An unexpected error occurred while adding the user.', 'error');
+        });
+    });
+
 
     // Handle Edit User - Show Modal and Populate
     // Make sure querySelectorAll and querySelector are specific enough if IDs are not unique
@@ -428,6 +467,47 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    if(editUserForm) { // Add null check for editUserForm
+        editUserForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            clearMessages(); // Clears user management messages
+            const userId = document.getElementById('edit_user_id').value;
+        const formData = new FormData(editUserForm);
+        const data = Object.fromEntries(formData.entries());
+
+        // Remove password if it's empty, so it's not sent unless changed
+        if (!data.password) {
+            delete data.password;
+        }
+         if (!data.name || !data.email) {
+            showMessage('Name and Email are required.', 'error');
+            return;
+        }
+
+        fetch(`/api/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json().then(body => ({ ok: response.ok, status: response.status, body })))
+        .then(({ ok, status, body }) => {
+            if (ok) {
+                showMessage(body.message || 'User updated successfully!', 'success');
+                editUserForm.reset();
+                editUserModal.style.display = 'none';
+                refreshPage(); // Reload to see updated user
+            } else {
+                showMessage(body.message || `Error updating user (HTTP ${status})`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Update user error:', error);
+            showMessage('An unexpected error occurred while updating the user.', 'error');
+        });
+    }); // This closes the editUserForm.addEventListener
+    } // This is the an important closing brace for if(editUserForm) that needs to be correctly placed.
+
 
     // Handle Delete User
     document.querySelectorAll('#userManagementArea .delete-user-btn').forEach(button => {
@@ -539,6 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
 
     // --- LLM Configuration Logic ---
     const llmConfigForm = document.getElementById('llmConfigForm');
@@ -683,5 +764,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loadAllConfigs();
 });
+
+    // The extra closing brace that was here has been removed.
+
 </script>
 {% endblock %}

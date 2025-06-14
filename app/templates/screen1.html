@@ -3,7 +3,10 @@
 {% block title %}Ask AI - Tallman App{% endblock %}
 
 {% block content %}
+
 <!-- Admin status is now set in base.html -->
+
+
 
 <h1>Ask AI (QA Screen)</h1>
 <p>Welcome, {{ session.name }}!</p>
@@ -34,6 +37,7 @@
         <button type="submit">Get Answer</button>
     </div>
 </form>
+
 
 <div id="answerSection" class="answer-container" style="margin-top: 30px; display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; background-color: #f9f9f9; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
     <div class="question-section">
@@ -70,6 +74,24 @@
             <p style="color: #7f8c8d; font-style: italic;">Relevant information will appear here...</p>
         </div>
     </div>
+
+<div id="answerSection" style="margin-top: 20px; display: none; border: 1px solid #eee; padding: 10px;">
+    <h2>Answer:</h2>
+    <p><strong>Your Question:</strong> <span id="displayedQuestion"></span></p>
+    <p id="llmAnswer"></p>
+    <div id="copyButtonContainer" style="display:none; margin-top: 10px;"> <!-- Initially hidden -->
+        <button id="copyQnAButton" class="rounded-full bg-[#f0f2f5] p-2.5">
+          <div class="text-[#111418]" data-icon="Copy" data-size="20px" data-weight="regular">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"></path>
+            </svg>
+          </div>
+        </button>
+        <p class="text-[#111418] text-sm font-medium leading-normal">Copy</p>
+    </div>
+    <h3>Relevant Snippets Used:</h3>
+    <div id="snippetsArea" style="font-size: 0.9em; color: #555;"></div>
+
 </div>
 
 <div id="correctionModule" style="margin-top: 20px; display: none; border: 1px solid #eee; padding: 10px;">
@@ -106,6 +128,7 @@
 
         const company = document.getElementById('company').value;
         const question_type = document.getElementById('question_type').value;
+
         const user_question = document.getElementById('user_question').value.trim();
 
         // Validate input
@@ -138,11 +161,80 @@
 
         try {
             const response = await fetch("{{ url_for('ask_ai_post') }}", {
+
+        const user_question = document.getElementById('user_question').value;
+
+        // Clear previous results
+        document.getElementById('answerSection').style.display = 'none';
+        document.getElementById('llmAnswer').textContent = '';
+        document.getElementById('snippetsArea').innerHTML = '';
+        document.getElementById('correctionModule').style.display = 'none';
+        document.getElementById('correctedAnswerSection').style.display = 'none';
+        document.getElementById('revisedLlmAnswer').textContent = '';
+        document.getElementById('copyAnswerButton').style.display = 'none';
+
+        const response = await fetch("{{ url_for('ask_ai_post') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // To help server identify AJAX
+            },
+            body: JSON.stringify({ company, question_type, user_question })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            document.getElementById('displayedQuestion').textContent = data.user_question;
+            document.getElementById('llmAnswer').textContent = data.answer;
+            document.getElementById('snippetsArea').innerHTML = data.retrieved_snippets_formatted.replace(/\\n/g, '<br>');
+            document.getElementById('answerSection').style.display = 'block';
+        // Show the new copy button container
+        const copyButtonContainer = document.getElementById('copyButtonContainer');
+        if (copyButtonContainer) copyButtonContainer.style.display = 'flex'; // Assuming it's a flex container for button + text
+
+            {% if session.status == 'admin' %}
+                document.getElementById('correctionModule').style.display = 'block';
+                document.getElementById('showCorrectionFormButton').style.display = 'inline-block'; // Show button
+                document.getElementById('correctionForm').style.display = 'none'; // Hide form initially
+                document.getElementById('original_question_for_correction').value = data.user_question;
+                document.getElementById('incorrect_answer_for_correction').value = data.answer;
+                document.getElementById('company_for_correction').value = data.company;
+            {% endif %}
+        } else {
+            let errorMessage = data.message || 'An error occurred.';
+            if (response.status === 401 && data.redirect_url) { // Handle login redirect for AJAX
+                alert('Session expired or login required. Redirecting to login page.');
+                window.location.href = data.redirect_url;
+                return;
+            }
+            document.getElementById('llmAnswer').textContent = "Error: " + errorMessage;
+            document.getElementById('snippetsArea').innerHTML = data.retrieved_snippets_formatted ? data.retrieved_snippets_formatted.replace(/\\n/g, '<br>') : "No snippets available.";
+            document.getElementById('answerSection').style.display = 'block';
+        }
+    });
+
+    {% if session.status == 'admin' %}
+        document.getElementById('showCorrectionFormButton').addEventListener('click', function() {
+            document.getElementById('correctionForm').style.display = 'block';
+            this.style.display = 'none'; // Hide the button itself
+        });
+
+        document.getElementById('correctionForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const original_question = document.getElementById('original_question_for_correction').value;
+            const incorrect_answer = document.getElementById('incorrect_answer_for_correction').value;
+            const user_correction_text = document.getElementById('user_correction_text').value;
+            const company = document.getElementById('company_for_correction').value;
+
+            const response = await fetch("{{ url_for('correct_answer_post') }}", {
+
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
-                },
+
                 body: JSON.stringify({ 
                     company: company, 
                     question_type: question_type, 
@@ -318,6 +410,43 @@ if (refs && Array.isArray(refs) && refs.length > 0) {
             });
         });
     }
+
+                body: JSON.stringify({ original_question, incorrect_answer, user_correction_text, company })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.status === 'success') {
+                document.getElementById('revisedLlmAnswer').textContent = data.new_answer;
+                document.getElementById('correctedAnswerSection').style.display = 'block';
+                // Optionally update the main answer as well
+                // document.getElementById('llmAnswer').textContent = data.new_answer;
+                alert(data.message || 'Correction submitted successfully!');
+                document.getElementById('correctionForm').style.display = 'none'; // Hide form again
+                // document.getElementById('showCorrectionFormButton').style.display = 'inline-block'; // Show button again
+            } else {
+                let errorMessage = data.message || 'Error submitting correction.';
+                 if (response.status === 401 && data.redirect_url) {
+                    alert('Session expired or login required. Redirecting to login page.');
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+                alert("Error: " + errorMessage);
+            }
+        });
+    {% endif %}
+
+    document.getElementById('copyAnswerButton').addEventListener('click', function() {
+        const question = document.getElementById('displayedQuestion').textContent;
+        const answer = document.getElementById('llmAnswer').textContent;
+        const textToCopy = `Question: ${question}\nAnswer: ${answer}`;
+        navigator.clipboard.writeText(textToCopy).then(function() {
+            alert('Question and Answer copied to clipboard!');
+        }, function(err) {
+            alert('Error copying text: ', err);
+        });
+    });
+
 
 </script>
 {% endblock %}
