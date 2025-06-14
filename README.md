@@ -1,3 +1,5 @@
+TO START CD to "C:\Users\rober\Desktop\TallmanChat-admin-user-qa-management" THEN  TYPE "python run.py"
+
 # TallmanChat
 
 ## Project Overview
@@ -173,6 +175,127 @@ Defines the application's URL endpoints and their corresponding logic.
 
 -   **`app/data/chroma_db/`**: This directory is used by ChromaDB to persist its database files. It contains SQLite files and other data necessary for ChromaDB's operation. This directory should typically be included in `.gitignore` if it becomes large or contains sensitive embeddings, but for this project, its existence is noted.
 
+
+## LDAP Authentication
+
+TallmanChat supports user authentication via an external LDAP directory. This allows users to log in with their existing corporate credentials, centralizing user management.
+
+### How It Works
+
+1.  **LDAP First**: When a user attempts to log in, the application first tries to authenticate them against the configured LDAP server.
+2.  **Local Fallback**: If LDAP authentication fails (e.g., the server is unreachable, or the user's credentials are not found in LDAP), the system automatically falls back to the local user database (`User.json`). This ensures that local administrators can always access the application, even if the LDAP service is unavailable.
+3.  **Automatic User Creation**: If a user authenticates successfully via LDAP but does not have a profile in the local `User.json` file, a new local profile is created for them automatically. This user is assigned a default 'user' role. An administrator can then elevate their privileges if needed.
+
+### Configuration
+
+LDAP settings are managed by an administrator on the **Admin -> Settings** page (`/manage_users`).
+
+The following settings can be configured:
+
+*   **Enable LDAP**: A toggle to turn LDAP authentication on or off globally.
+*   **LDAP Server**: The hostname or IP address of the LDAP server (e.g., `ldap.example.com`).
+*   **Port**: The port number for the LDAP service (typically `389` or `636` for SSL).
+*   **Use SSL**: A checkbox to enable a secure connection (LDAPS).
+*   **Base DN**: The base distinguished name for user searches (e.g., `ou=users,dc=example,dc=com`).
+*   **Bind User DN**: The distinguished name of a service account used to connect to and search the LDAP directory (e.g., `cn=admin,dc=example,dc=com`).
+*   **Bind User Password**: The password for the service account.
+
+Changes to these settings are saved to `app/data/config.json` and are applied immediately.
+
+## Local LLM Setup with Ollama
+
+TallmanChat can use Ollama to run local LLMs instead of OpenAI's API. This is especially useful for privacy, cost savings, or when internet access is limited.
+
+### Installing Ollama
+
+1. **Download and Install Ollama**
+   - Windows: Download the installer from [Ollama's GitHub releases](https://github.com/ollama/ollama/releases)
+   - macOS: `brew install ollama`
+   - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
+
+2. **Start the Ollama Service**
+   - Windows: The installer should start the service automatically
+   - macOS/Linux: Run `ollama serve` in a terminal
+
+3. **Download a Model**
+   ```bash
+   # Example: Download the mistral model (7B parameters)
+   ollama pull mistral
+   
+   # For better performance, you might want to try larger models like:
+   # ollama pull llama2
+   # ollama pull codellama
+   ```
+
+### Configuring TallmanChat to Use Ollama
+
+1. **Install Required Package**
+   ```bash
+   pip install ollama
+   ```
+
+2. **Modify `app/utils.py`**
+   Replace the `get_llm_answer` function with the following implementation:
+
+   ```python
+   import ollama
+   
+   def get_llm_answer(user_question: str, company: str, question_type: str, context_snippets: list[dict]) -> str:
+       if not context_snippets:
+           return "No relevant information found in the knowledge base."
+   
+       formatted_snippets = format_snippets_for_llm(context_snippets)
+       
+       try:
+           response = ollama.chat(
+               model="mistral",  # or your preferred model
+               messages=[
+                   {"role": "system", "content": f"You are a helpful assistant for {company}. Answer the question based on the provided context."},
+                   {"role": "user", "content": f"Question: {user_question}\n\nContext:\n{formatted_snippets}"}
+               ]
+           )
+           return response['message']['content'].strip()
+       except Exception as e:
+           print(f"Error calling Ollama: {e}")
+           # Fall back to the best matching snippet
+           if context_snippets and len(context_snippets) > 0:
+               return f"Here's the best matching information (LLM unavailable):\n\n{context_snippets[0].get('document', 'No matching content found.')}"
+           return "Error generating answer. Please try again later."
+   ```
+
+3. **Update `get_corrected_llm_answer`**
+   Similarly, update the correction function:
+
+   ```python
+   def get_corrected_llm_answer(original_question: str, incorrect_answer: str, user_correction_text: str, company: str) -> str:
+       try:
+           response = ollama.chat(
+               model="mistral",  # or your preferred model
+               messages=[
+                   {"role": "system", "content": f"You are a helpful assistant for {company}. A user is correcting an answer you provided."},
+                   {"role": "user", "content": f"Original question: {original_question}\n\nOriginal answer: {incorrect_answer}\n\nUser's correction: {user_correction_text}\n\nPlease provide an improved answer based on the user's correction."}
+               ]
+           )
+           return response['message']['content'].strip()
+       except Exception as e:
+           print(f"Error in get_corrected_llm_answer: {e}")
+           return "Using your correction directly: " + user_correction_text
+   ```
+
+4. **Remove OpenAI Dependency**
+   You can now remove the OpenAI package if not needed for other parts of your application:
+   ```bash
+   pip uninstall openai
+   ```
+
+### Performance Considerations
+
+- **Hardware Requirements**: Local LLMs require significant RAM and compute power. The 7B parameter models need at least 8GB of RAM, while larger models need 16GB+.
+- **Response Time**: Expect slower responses compared to cloud-based APIs, especially on CPU-only systems.
+- **Model Selection**: Start with smaller models (like mistral-7b) and only move to larger models if needed for better quality.
+- **GPU Acceleration**: For better performance, ensure you have CUDA-compatible GPU and proper drivers installed.
+
+
 ## Installation and Setup
 
 Follow these steps to set up and run TallmanChat locally:
@@ -207,8 +330,9 @@ Follow these steps to set up and run TallmanChat locally:
 5.  **Set Up Environment Variables:**
     The application requires an OpenAI API key to function. Create a `.env` file in the root directory of the project (ensure this file is listed in your `.gitignore` to prevent committing secrets).
     Add your OpenAI API key to the `.env` file:
-    ```
+
     OPENAI_API_KEY='your_openai_api_key_here'
+
     ```
     The application (`app/utils.py`) will load this key using `os.getenv("OPENAI_API_KEY")`. (Note: The current code directly uses `os.getenv`. For `.env` file loading, a library like `python-dotenv` would be used, which is included in `requirements.txt`. The app should be updated or it should be noted that the environment variable must be set in the system globally if `python-dotenv` is not used to explicitly load the `.env` file.)
 
@@ -283,12 +407,22 @@ Follow these steps to set up and run TallmanChat locally:
     This will populate the `app/data/chroma_db` directory.
 
 9.  **Run the Application:**
+
+    ```powershell
+    python run.py
+
     ```bash
-    python app/app.py
+    python app/app.py>>>>>>> main
     ```
     The application should now be running (by default, on `http://0.0.0.0:5000` or `http://127.0.0.1:5000`).
 
 ## How to Use
+
+Run from the root directory:
+```powershell
+python run.py
+```
+
 
 1.  **Access the Application:** Open your web browser and navigate to `http://127.0.0.1:5000`.
 2.  **Login:** You will be redirected to the login page. Use the credentials you set up in `User.json` (e.g., `admin@example.com` and the password you chose).

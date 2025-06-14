@@ -150,10 +150,101 @@
 </div>
 
 
+<hr class="my-5"> <!-- Separator -->
+
+<div id="llmConfigArea" class="mt-4">
+    <h2>LLM Configuration</h2>
+    <p>Select the LLM provider and configure endpoints.</p>
+    <div id="llmConfigMessages" class="mb-3"></div>
+
+    <form id="llmConfigForm">
+        <div class="form-group mb-3">
+            <label for="llmProvider">LLM Provider:</label>
+            <select id="llmProvider" name="llm_provider" class="form-control">
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama</option>
+            </select>
+        </div>
+
+        <div id="ollamaFields" style="display: none;">
+            <div class="form-group mb-3">
+                <label for="ollamaEndpoint">Ollama API Endpoint:</label>
+                <input type="text" id="ollamaEndpoint" name="ollama_endpoint" class="form-control" placeholder="e.g., http://localhost:11434/api/generate">
+            </div>
+            <div class="form-group mb-3">
+                <label for="ollamaModel">Ollama Model Name:</label>
+                <input type="text" id="ollamaModel" name="selected_model" class="form-control" placeholder="e.g., llama3">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save LLM Configuration</button>
+    </form>
+</div>
+
+<hr class="my-5"> <!-- Separator -->
+
+<div id="ldapConfigArea" class="mt-4">
+    <h2>LDAP Configuration</h2>
+    <p>Configure settings for LDAP authentication.</p>
+    <div id="ldapConfigMessages" class="mb-3"></div>
+
+    <form id="ldapConfigForm">
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="ldapEnabled" name="ldap.enabled">
+            <label class="form-check-label" for="ldapEnabled">Enable LDAP Authentication</label>
+        </div>
+
+        <div id="ldapFields" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label for="ldapServer">LDAP Server:</label>
+                        <input type="text" id="ldapServer" name="ldap.server" class="form-control" placeholder="e.g., ldap://your-server.com">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group mb-3">
+                        <label for="ldapPort">Port:</label>
+                        <input type="number" id="ldapPort" name="ldap.port" class="form-control" placeholder="389">
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="ldapUseSsl" name="ldap.use_ssl">
+                        <label class="form-check-label" for="ldapUseSsl">Use SSL</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="ldapBaseDn">Base DN:</label>
+                <input type="text" id="ldapBaseDn" name="ldap.base_dn" class="form-control" placeholder="e.g., ou=users,dc=example,dc=com">
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="ldapBindUserDn">Bind User DN:</label>
+                <input type="text" id="ldapBindUserDn" name="ldap.bind_user_dn" class="form-control" placeholder="e.g., cn=admin,dc=example,dc=com">
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="ldapBindUserPassword">Bind User Password:</label>
+                <input type="password" id="ldapBindUserPassword" name="ldap.bind_user_password" class="form-control">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save LDAP Configuration</button>
+    </form>
+</div>
+
+
+
 {% endblock %}
 
 {% block scripts_extra %}
 <script>
+
+document.addEventListener('DOMContentLoaded', function() {
+
     const userManagementMessages = document.getElementById('userManagementMessages'); // User management messages
     const qaManagementMessages = document.getElementById('qaManagementMessages'); // Q&A management messages
     const addUserModal = document.getElementById('addUserModal');
@@ -186,6 +277,67 @@
     });
 
     // Handle Add User
+
+    if (addUserForm) {
+        addUserForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            clearMessages();
+            
+            // Create data object with the required fields
+            const data = {
+                name: document.getElementById('add_user_name').value.trim(),
+                email: document.getElementById('add_user_email').value.trim(),
+                password: document.getElementById('add_user_password').value,
+                status: document.getElementById('add_user_status').value || 'user'
+            };
+
+            // Validate required fields
+            if (!data.name || !data.email || !data.password) {
+                showMessage('Name, Email, and Password are required.', 'error');
+                return;
+            }
+
+            // Show loading state
+            const submitButton = addUserForm.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+            fetch('/api/users', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'  // Add this to identify AJAX requests
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json().then(body => ({
+                ok: response.ok, 
+                status: response.status, 
+                body
+            })))
+            .then(({ ok, status, body }) => {
+                if (ok) {
+                    showMessage(body.message || 'User added successfully!', 'success');
+                    addUserForm.reset();
+                    addUserModal.style.display = 'none';
+                    // Small delay to show success message before refresh
+                    setTimeout(() => refreshPage(), 1000);
+                } else {
+                    showMessage(body.message || `Error adding user (HTTP ${status})`, 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            })
+            .catch(error => {
+                console.error('Add user error:', error);
+                showMessage('An unexpected error occurred while adding the user.', 'error');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            });
+        });
+    }
+
     addUserForm.addEventListener('submit', function(event) {
         event.preventDefault();
         clearMessages();
@@ -219,6 +371,7 @@
         });
     });
 
+
     // Handle Edit User - Show Modal and Populate
     // Make sure querySelectorAll and querySelector are specific enough if IDs are not unique
     document.querySelectorAll('#userManagementArea .edit-user-btn').forEach(button => {
@@ -248,6 +401,73 @@
 
 
     // Handle Edit User Form Submission
+    if(editUserForm) {
+        editUserForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            clearMessages(); // Clears user management messages
+            
+            const userId = document.getElementById('edit_user_id').value;
+            
+            // Create data object with the required fields
+            const data = {
+                name: document.getElementById('edit_user_name').value.trim(),
+                email: document.getElementById('edit_user_email').value.trim(),
+                status: document.getElementById('edit_user_status').value,
+                password: document.getElementById('edit_user_password').value.trim() || undefined
+            };
+
+            // Validate required fields
+            if (!data.name || !data.email) {
+                showMessage('Name and Email are required.', 'error');
+                return;
+            }
+
+            // Show loading state
+            const submitButton = editUserForm.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+            // Remove password from data if it's empty
+            if (!data.password) {
+                delete data.password;
+            }
+
+            fetch(`/api/users/${userId}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'  // Add this to identify AJAX requests
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json().then(body => ({
+                ok: response.ok, 
+                status: response.status, 
+                body
+            })))
+            .then(({ ok, status, body }) => {
+                if (ok) {
+                    showMessage(body.message || 'User updated successfully!', 'success');
+                    editUserForm.reset();
+                    editUserModal.style.display = 'none';
+                    // Small delay to show success message before refresh
+                    setTimeout(() => refreshPage(), 1000);
+                } else {
+                    showMessage(body.message || `Error updating user (HTTP ${status})`, 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            })
+            .catch(error => {
+                console.error('Update user error:', error);
+                showMessage('An unexpected error occurred while updating the user.', 'error');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            });
+        });
+    }
+
     if(editUserForm) { // Add null check for editUserForm
         editUserForm.addEventListener('submit', function(event) {
             event.preventDefault();
@@ -287,6 +507,7 @@
         });
     }); // This closes the editUserForm.addEventListener
     } // This is the an important closing brace for if(editUserForm) that needs to be correctly placed.
+
 
     // Handle Delete User
     document.querySelectorAll('#userManagementArea .delete-user-btn').forEach(button => {
@@ -398,6 +619,153 @@
             });
         });
     }
+
+
+    // --- LLM Configuration Logic ---
+    const llmConfigForm = document.getElementById('llmConfigForm');
+    const llmProviderSelect = document.getElementById('llmProvider');
+    const ollamaFields = document.getElementById('ollamaFields');
+    const llmConfigMessages = document.getElementById('llmConfigMessages');
+
+    function showLlmMessage(message, type = 'success') {
+        llmConfigMessages.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'danger'}" role="alert">${message}</div>`;
+    }
+
+    function toggleOllamaFields() {
+        if (llmProviderSelect.value === 'ollama') {
+            ollamaFields.style.display = 'block';
+        } else {
+            ollamaFields.style.display = 'none';
+        }
+    }
+
+    if (llmProviderSelect) {
+        llmProviderSelect.addEventListener('change', toggleOllamaFields);
+    }
+
+    if (llmConfigForm) {
+        llmConfigForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const currentConfigRes = await fetch('/api/config');
+            const currentConfig = await currentConfigRes.json();
+
+            const formData = new FormData(llmConfigForm);
+            const llmConfig = Object.fromEntries(formData.entries());
+
+            currentConfig.llm_provider = llmConfig.llm_provider;
+            currentConfig.ollama_endpoint = llmConfig.ollama_endpoint;
+            currentConfig.selected_model = llmConfig.selected_model;
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentConfig)
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Failed to save config.');
+                
+                showLlmMessage('LLM configuration saved successfully!', 'success');
+            } catch (error) {
+                showLlmMessage(error.message, 'danger');
+            }
+        });
+    }
+
+    // --- LDAP Configuration Logic ---
+    const ldapConfigForm = document.getElementById('ldapConfigForm');
+    const ldapEnabledCheckbox = document.getElementById('ldapEnabled');
+    const ldapFields = document.getElementById('ldapFields');
+    const ldapConfigMessages = document.getElementById('ldapConfigMessages');
+
+    function showLdapMessage(message, type = 'success') {
+        ldapConfigMessages.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'danger'}" role="alert">${message}</div>`;
+    }
+
+    function toggleLdapFields() {
+        if (ldapEnabledCheckbox && ldapEnabledCheckbox.checked) {
+            ldapFields.style.display = 'block';
+        } else if (ldapFields) {
+            ldapFields.style.display = 'none';
+        }
+    }
+
+    if (ldapEnabledCheckbox) {
+        ldapEnabledCheckbox.addEventListener('change', toggleLdapFields);
+    }
+
+    if (ldapConfigForm) {
+        ldapConfigForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const currentConfigRes = await fetch('/api/config');
+            const currentConfig = await currentConfigRes.json();
+
+            const formData = new FormData(ldapConfigForm);
+            
+            const ldapConfig = {
+                enabled: formData.has('ldap.enabled'),
+                server: formData.get('ldap.server'),
+                port: parseInt(formData.get('ldap.port'), 10) || 389,
+                use_ssl: formData.has('ldap.use_ssl'),
+                base_dn: formData.get('ldap.base_dn'),
+                bind_user_dn: formData.get('ldap.bind_user_dn'),
+                bind_user_password: formData.get('ldap.bind_user_password') || (currentConfig.ldap ? currentConfig.ldap.bind_user_password : '')
+            };
+            
+            currentConfig.ldap = {...(currentConfig.ldap || {}), ...ldapConfig};
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentConfig)
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Failed to save config.');
+                
+                showLdapMessage('LDAP configuration saved successfully!', 'success');
+            } catch (error) {
+                showLdapMessage(error.message, 'danger');
+            }
+        });
+    }
+
+    // --- Load All Configurations on Page Load ---
+    async function loadAllConfigs() {
+        try {
+            const response = await fetch('/api/config');
+            if (!response.ok) throw new Error('Failed to load configurations.');
+            const config = await response.json();
+
+            // Populate LLM Form
+            if (document.getElementById('llmProvider')) {
+                document.getElementById('llmProvider').value = config.llm_provider || 'openai';
+                document.getElementById('ollamaEndpoint').value = config.ollama_endpoint || '';
+                document.getElementById('ollamaModel').value = config.selected_model || '';
+                toggleOllamaFields();
+            }
+
+            // Populate LDAP Form
+            if (config.ldap && document.getElementById('ldapEnabled')) {
+                ldapEnabledCheckbox.checked = config.ldap.enabled;
+                document.getElementById('ldapServer').value = config.ldap.server || '';
+                document.getElementById('ldapPort').value = config.ldap.port || 389;
+                document.getElementById('ldapUseSsl').checked = config.ldap.use_ssl;
+                document.getElementById('ldapBaseDn').value = config.ldap.base_dn || '';
+                document.getElementById('ldapBindUserDn').value = config.ldap.bind_user_dn || '';
+                toggleLdapFields();
+            }
+        } catch (error) {
+            if(llmConfigMessages) showLlmMessage(error.message, 'danger');
+            if(ldapConfigMessages) showLdapMessage(error.message, 'danger');
+        }
+    }
+
+    loadAllConfigs();
+});
+
     // The extra closing brace that was here has been removed.
+
 </script>
 {% endblock %}
